@@ -34,11 +34,15 @@ const machineFiles = [
 ];
 
 const checkItems = [
-    { category: "拍照", item: "外部視角", target: "拍攝正面、背面、左側、右側" },
-    { category: "拍照", item: "電控箱內部", target: "拍攝接線、斷路器、配線佈局狀況" },
-    { category: "拍照", item: "製程區域", target: "拍攝反應室 (Chamber) 內部、載台現況特寫" },
-    { category: "拍照", item: "附屬設備", target: "拍攝幫浦 (Pumps)、冷卻機 (Chillers)、控制器" },
-    { category: "拍照", item: "關鍵接線", target: "拍攝電纜連接處、插槽編號、線標標籤特寫" }
+    { category: "清點", item: "設備清單核對", target: "逐一核對廠商、型號、Tool ID 是否與清單一致", type: "checkbox+note" },
+    { category: "紀錄", item: "整體尺寸", target: "量測設備整體：長(cm) x 寬(cm) x 高(cm)", type: "text" },
+    { category: "紀錄", item: "組件尺寸", target: "各獨立組件拆解後的尺寸紀錄", type: "text" },
+    { category: "檢查", item: "損傷檢查", target: "檢查有無腐蝕、生鏽、化學噴濺痕跡", type: "text" },
+    { category: "檢查", item: "接頭檢查", target: "檢查 Connector 針腳、光纖、氣壓接頭損壞", type: "text" },
+    { category: "檢查", item: "污染檢查", target: "紀錄反應室殘留物或設備漏油/漏水", type: "text" },
+    { category: "紀錄", item: "拆解順序", target: "紀錄拆機步驟與使用之特殊工具", type: "text" },
+    { category: "紀錄", item: "電力資訊", target: "電壓(V)、相數(Ph)、瓦數(W) 或電流(A)", type: "text" },
+    { category: "紀錄", item: "水/氣介面", target: "紀錄管徑尺寸與介面規格 (如 VCR, Swagelok)", type: "text" }
 ];
 
 const docItems = [
@@ -321,22 +325,44 @@ function loadMachineData(machineName) {
             }
         }
 
+        let stateHtml = '';
+        if (item.type === 'checkbox+note') {
+            const isChecked = savedRecords[`check_${index}`] || false;
+            const noteText = savedRecords[`note_${index}`] || '';
+            stateHtml = `
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                    <label style="display:flex; align-items:center; gap:6px; font-weight: 500;">
+                        <input type="checkbox" class="status-check" data-index="${index}" ${isChecked ? 'checked' : ''} ${!isAdmin ? 'disabled' : ''} style="width: 16px; height: 16px; cursor: pointer;">
+                        <span>完成 (V)</span>
+                    </label>
+                    <input type="text" class="status-note w-full" data-index="${index}" value="${noteText}" placeholder="備註..." ${!isAdmin ? 'disabled' : ''}>
+                </div>
+            `;
+        } else {
+            stateHtml = `<input type="text" class="status-input w-full" data-index="${index}" value="${savedState}" placeholder="輸入紀錄..." ${!isAdmin ? 'disabled' : ''}>`;
+        }
+
         tr.innerHTML = `
             <td><strong>${item.category}</strong></td>
             <td>${item.item}</td>
             <td>${item.target}</td>
-            <td>
-                <input type="text" class="status-input w-full" data-index="${index}" value="${savedState}" placeholder="輸入紀錄..." ${!isAdmin ? 'disabled' : ''}>
-            </td>
+            <td>${stateHtml}</td>
             <td>${photoHtml}</td>
         `;
 
         // Bind input event
         if (isAdmin) {
-            const textInput = tr.querySelector('.status-input');
-            textInput.addEventListener('change', (e) => {
-                saveRecord(machineName, stateKey, e.target.value);
-            });
+            if (item.type === 'checkbox+note') {
+                const checkInput = tr.querySelector('.status-check');
+                const noteInput = tr.querySelector('.status-note');
+                checkInput.addEventListener('change', (e) => saveRecord(machineName, `check_${index}`, e.target.checked));
+                noteInput.addEventListener('change', (e) => saveRecord(machineName, `note_${index}`, e.target.value));
+            } else {
+                const textInput = tr.querySelector('.status-input');
+                textInput.addEventListener('change', (e) => {
+                    saveRecord(machineName, stateKey, e.target.value);
+                });
+            }
 
             const pInput = tr.querySelector('.photo-input');
             if (pInput) {
