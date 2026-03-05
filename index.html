@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ark & Optilab 專案管理系統</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="global-layout">
+        <!-- Global Sidebar -->
+        <nav class="global-sidebar glass-panel">
+            <div class="brand-icon" title="首頁">
+                🚀
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item active" data-target="view-machine" title="機台詳細資訊">
+                    <div class="nav-icon">📊</div>
+                    <span class="nav-text">機台資訊</span>
+                </li>
+                <li class="nav-item" data-target="view-report" title="現場每日回報">
+                    <div class="nav-icon">📝</div>
+                    <span class="nav-text">每日回報</span>
+                </li>
+                <li class="nav-item" data-target="view-schedule" title="進度及值班人員">
+                    <div class="nav-icon">📅</div>
+                    <span class="nav-text">排程與值班</span>
+                </li>
+            </ul>
+            <div class="nav-bottom">
+                <div class="auth-status-mini">
+                    <span id="globalUserStatus" class="status-badge viewer" title="目前為檢視模式">👁️</span>
+                </div>
+            </div>
+        </nav>
+
+        <!-- View Collections -->
+        <div class="view-content">
+
+            <!-- ==========================================
+                 VIEW 1: 機台資訊 (Machine Query)
+                 ========================================== -->
+            <div id="view-machine" class="view-section active">
+                <div class="app-container">
+                    <!-- Sidebar -->
+                    <aside class="sidebar">
+                        <div class="sidebar-header">
+                            <h1>機台詳細資訊</h1>
+                            <p>請勾選以查詢機台狀態</p>
+                            <div class="search-box">
+                                <input type="text" id="searchInput" placeholder="搜尋機台名稱...">
+                            </div>
+                        </div>
+                        <div class="machine-list" id="machineList">
+                            <!-- Machine List Items will be injected here via JavaScript -->
+                        </div>
+                    </aside>
+
+                    <!-- Main Content Panel -->
+                    <main class="main-panel">
+                        <!-- Top Action Bar -->
+                        <div class="top-bar">
+                            <div class="auth-status">
+                                <span id="userStatus" class="status-badge viewer">檢視模式</span>
+                            </div>
+                            <button id="loginBtn" class="btn btn-primary">管理員登入</button>
+                            <button id="logoutBtn" class="btn btn-outline hidden">登出</button>
+                        </div>
+
+                        <div class="glass-container" id="detailPanel">
+                            <div class="placeholder-state" id="placeholderState">
+                                <div class="icon">🔍</div>
+                                <h2>尚未選擇機台</h2>
+                                <p>請從左側選單勾選想要查詢的機台以檢視資料</p>
+                            </div>
+                            <div class="content-state hidden" id="contentState">
+                                <div class="content-header">
+                                    <div class="header-title">
+                                        <h2 id="machineTitle">機台名稱</h2>
+                                        <span class="badge">待移機台</span>
+                                    </div>
+
+                                    <!-- Tabs -->
+                                    <div class="tabs">
+                                        <button class="tab-btn active" data-tab="tab-pdf">原始機台資訊</button>
+                                        <button class="tab-btn" data-tab="tab-records">搬移過程紀錄</button>
+                                        <button class="tab-btn" data-tab="tab-docs">相關文件狀態</button>
+                                    </div>
+                                </div>
+
+                                <div class="tab-content" id="tabContent">
+                                    <!-- Tab 1: PDF Viewer -->
+                                    <div class="tab-pane active" id="tab-pdf">
+                                        <div class="pdf-container" id="pdfContainer">
+                                            <!-- PDF will be shown here -->
+                                        </div>
+                                    </div>
+
+                                    <!-- Tab 2: Migration Records -->
+                                    <div class="tab-pane" id="tab-records">
+                                        <div class="form-container scrollable">
+                                            <h3>搬移過程紀錄表</h3>
+                                            <p class="help-text">請依序填寫並拍照上傳各檢查項目（僅管理員可編輯）。</p>
+                                            <form id="recordsForm">
+                                                <table class="data-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th width="10%">類別</th>
+                                                            <th width="20%">檢查項目</th>
+                                                            <th width="35%">具體工作內容</th>
+                                                            <th width="15%">狀態/紀錄</th>
+                                                            <th width="20%">照片上傳/檢視</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="recordsTbody"></tbody>
+                                                </table>
+                                            </form>
+                                        </div>
+                                    </div>
+
+                                    <!-- Tab 3: Documents Status -->
+                                    <div class="tab-pane" id="tab-docs">
+                                        <div class="form-container scrollable">
+                                            <h3>相關文件取得狀態</h3>
+                                            <p class="help-text">請勾選各項機台相關文件的取得狀況與備註（僅管理員可編輯）。</p>
+                                            <form id="docsForm">
+                                                <table class="data-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th width="10%">類別</th>
+                                                            <th width="25%">文件名稱 (英文)</th>
+                                                            <th width="25%">中文對照</th>
+                                                            <th width="20%">取得方式</th>
+                                                            <th width="20%">備註</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="docsTbody"></tbody>
+                                                </table>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+                </div>
+            </div>
+
+            <!-- ==========================================
+                 VIEW 2: 現場每日回報 (Daily Report)
+                 ========================================== -->
+            <div id="view-report" class="view-section hidden">
+                <div class="report-container">
+                    <div class="report-main">
+                        <!-- Left: Form -->
+                        <div class="report-form-section glass-container">
+                            <div class="section-header">
+                                <h2>新增每日日誌</h2>
+                                <p>請填寫今日工作進度並上傳 3-5 張關鍵照片</p>
+                            </div>
+
+                            <form id="dailyReportForm" class="report-form">
+                                <div class="form-row">
+                                    <div class="form-group half">
+                                        <label for="reportDate">日期</label>
+                                        <input type="date" id="reportDate" class="form-control" required>
+                                    </div>
+                                    <div class="form-group half">
+                                        <label for="reporterName">回報人員</label>
+                                        <input type="text" id="reporterName" class="form-control" placeholder="請輸入姓名"
+                                            required>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="siteName">站點 / 機台 / 專案名稱</label>
+                                    <input type="text" id="siteName" class="form-control"
+                                        placeholder="例如：台積電 F18 P3 - Coater 機台" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="progressDesc">今日工作進度摘要</label>
+                                    <textarea id="progressDesc" class="form-control" rows="4"
+                                        placeholder="請簡述今日完成的工作項目..." required></textarea>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="issueDesc">異常狀況 / 需總部協助事項</label>
+                                    <textarea id="issueDesc" class="form-control" rows="3"
+                                        placeholder="若無異常填寫「無」，若有需要協助請詳述..."></textarea>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>關鍵照片上傳 (最多 5 張)</label>
+                                    <div class="photo-upload-container">
+                                        <div class="photo-grid" id="photoGrid">
+                                            <div class="upload-btn-wrapper" id="uploadBtnWrapper">
+                                                <label class="upload-placeholder" for="photoInput">
+                                                    <div class="upload-icon">+</div>
+                                                    <span>新增照片</span>
+                                                </label>
+                                                <input type="file" id="photoInput" accept="image/*" multiple>
+                                            </div>
+                                        </div>
+                                        <p class="photo-hint">已上傳 <span id="photoCount">0</span>/5 張</p>
+                                    </div>
+                                </div>
+
+                                <div class="form-actions">
+                                    <button type="button" id="clearFormBtn" class="btn btn-outline">清除重填</button>
+                                    <button type="submit" id="submitReportBtn"
+                                        class="btn btn-primary btn-block">送出回報</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Right: History -->
+                        <div class="report-history-section glass-container">
+                            <div class="section-header">
+                                <h2>歷史回報紀錄</h2>
+                                <p>近期的現場日誌與照片 (預設存於本機)</p>
+                            </div>
+                            <div class="history-list scrollable" id="historyList">
+                                <div class="placeholder-state" id="historyPlaceholder" style="padding: 40px 20px;">
+                                    <div class="icon" style="font-size: 3rem; animation: none;">📝</div>
+                                    <h2 style="font-size: 1.2rem;">尚無紀錄</h2>
+                                    <p style="font-size: 0.9rem;">您的回報將會顯示在這裡</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==========================================
+                 VIEW 3: 排程與值班 (Schedule)
+                 ========================================== -->
+            <div id="view-schedule" class="view-section hidden">
+                <div class="schedule-container glass-container">
+                    <div class="section-header"
+                        style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <h2>專案進度與值班人員表</h2>
+                            <p>3 月份機台搬移排程概觀 (Qualcomm 設備環境)</p>
+                        </div>
+                        <div class="schedule-legend">
+                            <span class="legend-item"><span class="legend-color"
+                                    style="background: rgba(245, 158, 11, 0.2); border: 1px solid #f59e0b;"></span> 清潔
+                                (Pre-deinstall)</span>
+                            <span class="legend-item"><span class="legend-color"
+                                    style="background: rgba(16, 185, 129, 0.2); border: 1px solid #10b981;"></span> 拆機
+                                (Deinstall)</span>
+                            <span class="legend-item"><span class="legend-color"
+                                    style="background: rgba(59, 130, 246, 0.2); border: 1px solid #3b82f6;"></span>
+                                包裝&吊裝 (Wrapping & Rigging)</span>
+                        </div>
+                    </div>
+
+                    <div
+                        style="flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 12px; background: rgba(0,0,0,0.3); padding: 10px;">
+                        <img src="排程相片/排程.jpg" alt="專案進度與值班人員表"
+                            style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px;">
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div class="modal hidden" id="loginModal">
+        <div class="modal-content glass-panel">
+            <div class="modal-header">
+                <h2>管理員登入</h2>
+                <button class="close-btn" id="closeModalBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="adminId">帳號</label>
+                    <input type="text" id="adminId" placeholder="請輸入帳號" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="adminPwd">密碼</label>
+                    <input type="password" id="adminPwd" placeholder="請輸入密碼">
+                </div>
+                <div id="loginError" class="error-msg hidden">帳號或密碼錯誤</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="cancelLoginBtn">取消</button>
+                <button class="btn btn-primary" id="submitLoginBtn">登入</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="Lookup info.js"></script>
+</body>
+
+</html>
