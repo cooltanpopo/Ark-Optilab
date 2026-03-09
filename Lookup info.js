@@ -35,14 +35,11 @@ const machineFiles = [
 
 const checkItems = [
     { category: "清點", item: "設備清單核對", target: "逐一核對廠商、型號、Tool ID 是否與清單一致", type: "checkbox+note" },
-    { category: "紀錄", item: "整體尺寸", target: "量測設備整體：長(cm) x 寬(cm) x 高(cm)", type: "text" },
-    { category: "紀錄", item: "組件尺寸", target: "各獨立組件拆解後的尺寸紀錄", type: "text" },
-    { category: "檢查", item: "損傷檢查", target: "檢查有無腐蝕、生鏽、化學噴濺痕跡", type: "text" },
-    { category: "檢查", item: "接頭檢查", target: "檢查 Connector 針腳、光纖、氣壓接頭損壞", type: "text" },
-    { category: "檢查", item: "污染檢查", target: "紀錄反應室殘留物或設備漏油/漏水", type: "text" },
-    { category: "紀錄", item: "拆解順序", target: "紀錄拆機步驟與使用之特殊工具", type: "text" },
-    { category: "紀錄", item: "電力資訊", target: "電壓(V)、相數(Ph)、瓦數(W) 或電流(A)", type: "text" },
-    { category: "紀錄", item: "水/氣介面", target: "紀錄管徑尺寸與介面規格 (如 VCR, Swagelok)", type: "text" }
+    { category: "紀錄", item: "整體尺寸", target: "量測設備整體：長(cm) x 寬(cm) x 高(cm)", type: "checkbox" },
+    { category: "紀錄", item: "組件尺寸", target: "各獨立組件拆解後的尺寸紀錄", type: "checkbox" },
+    { category: "檢查", item: "損傷檢查", target: "檢查有無腐蝕、生鏽、化學噴濺痕跡", type: "checkbox-yesno" },
+    { category: "紀錄", item: "電力資訊", target: "電壓(V)、相數(Ph)、瓦數(W) 或電流(A)", type: "checkbox" },
+    { category: "紀錄", item: "水/氣介面", target: "紀錄管徑尺寸與介面規格 (如 VCR, Swagelok)", type: "checkbox" }
 ];
 
 const docItems = [
@@ -221,6 +218,9 @@ function initMachineList() {
             const displayName = file.replace('.pdf', '');
             const item = document.createElement('label');
             item.className = 'machine-item';
+            if (window.hasMachineDataUploaded && window.hasMachineDataUploaded(displayName)) {
+                item.classList.add('has-data');
+            }
 
             const radioHtml = `
                 <div class="checkbox-wrapper">
@@ -338,6 +338,17 @@ function loadMachineData(machineName) {
                     <input type="text" class="status-note w-full" data-index="${index}" value="${noteText}" placeholder="備註..." ${!isAdmin ? 'disabled' : ''}>
                 </div>
             `;
+        } else if (item.type === 'checkbox' || item.type === 'checkbox-yesno') {
+            const isChecked = savedRecords[`check_${index}`] || false;
+            const labelText = item.type === 'checkbox-yesno' ? '是 (V)' : '完成 (V)';
+            stateHtml = `
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                    <label style="display:flex; align-items:center; gap:6px; font-weight: 500;">
+                        <input type="checkbox" class="status-check" data-index="${index}" ${isChecked ? 'checked' : ''} ${!isAdmin ? 'disabled' : ''} style="width: 16px; height: 16px; cursor: pointer;">
+                        <span>${labelText}</span>
+                    </label>
+                </div>
+            `;
         } else {
             stateHtml = `<input type="text" class="status-input w-full" data-index="${index}" value="${savedState}" placeholder="輸入紀錄..." ${!isAdmin ? 'disabled' : ''}>`;
         }
@@ -357,6 +368,9 @@ function loadMachineData(machineName) {
                 const noteInput = tr.querySelector('.status-note');
                 checkInput.addEventListener('change', (e) => saveRecord(machineName, `check_${index}`, e.target.checked));
                 noteInput.addEventListener('change', (e) => saveRecord(machineName, `note_${index}`, e.target.value));
+            } else if (item.type === 'checkbox' || item.type === 'checkbox-yesno') {
+                const checkInput = tr.querySelector('.status-check');
+                checkInput.addEventListener('change', (e) => saveRecord(machineName, `check_${index}`, e.target.checked));
             } else {
                 const textInput = tr.querySelector('.status-input');
                 textInput.addEventListener('change', (e) => {
@@ -374,6 +388,7 @@ function loadMachineData(machineName) {
                 delBtn.addEventListener('click', () => {
                     saveRecord(machineName, photoKey, null);
                     loadMachineData(machineName); // re-render
+                    if (window.updateMachineListStatus) window.updateMachineListStatus();
                 });
             }
         }
@@ -451,9 +466,34 @@ function handlePhotoUpload(e, machine, key) {
     reader.onload = function (evt) {
         saveRecord(machine, key, evt.target.result);
         loadMachineData(machine);
+        if (window.updateMachineListStatus) window.updateMachineListStatus();
     };
     reader.readAsDataURL(file);
 }
+
+window.hasMachineDataUploaded = function (machineName) {
+    const savedRecords = JSON.parse(localStorage.getItem(`records_${machineName}`)) || {};
+    for (const key in savedRecords) {
+        if (key.startsWith('photo_') && savedRecords[key] !== null) {
+            return true;
+        }
+    }
+    return false;
+};
+
+window.updateMachineListStatus = function () {
+    const items = document.querySelectorAll('.machine-item');
+    items.forEach(item => {
+        const input = item.querySelector('input[type="radio"]');
+        if (!input) return;
+        const displayName = input.value.replace('.pdf', '');
+        if (window.hasMachineDataUploaded(displayName)) {
+            item.classList.add('has-data');
+        } else {
+            item.classList.remove('has-data');
+        }
+    });
+};
 
 // ==========================================
 // 8. Daily Report Logic

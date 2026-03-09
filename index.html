@@ -51,7 +51,20 @@
                     <aside class="sidebar">
                         <div class="sidebar-header">
                             <h1>機台詳細資訊</h1>
-                            <p>請勾選以查詢機台狀態</p>
+                            <p style="margin-bottom: 8px;">請勾選以查詢機台狀態</p>
+                            <div class="status-legend"
+                                style="display: flex; gap: 12px; margin-bottom: 16px; font-size: 0.85rem;">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <span
+                                        style="width: 12px; height: 12px; border-radius: 50%; background: rgba(16, 185, 129, 0.15); border: 1px solid var(--success);"></span>
+                                    <span style="color: var(--text-secondary);">有資料上傳</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <span
+                                        style="width: 12px; height: 12px; border-radius: 50%; background: transparent; border: 1px solid var(--border-color);"></span>
+                                    <span style="color: var(--text-secondary);">未有資料</span>
+                                </div>
+                            </div>
                             <div class="search-box">
                                 <input type="text" id="searchInput" placeholder="搜尋機台名稱...">
                             </div>
