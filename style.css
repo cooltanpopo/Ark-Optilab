@@ -717,11 +717,11 @@ select.form-control:disabled {
 
 .photo-preview:hover,
 .photo-preview-mini img:hover {
-    transform: scale(8);
+    transform: scale(15);
     position: relative;
     z-index: 999;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-    transform-origin: center center;
+    transform-origin: right center;
 }
 
 .photo-preview-mini {
