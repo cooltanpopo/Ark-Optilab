@@ -337,7 +337,7 @@ function loadMachineData(machineName) {
         let photoHtml = '';
         if (savedPhoto) {
             photoHtml = `
-                <div class="photo-preview-mini">
+                <div class="photo-preview-mini" style="background-image: url('${savedPhoto}')">
                     <img src="${savedPhoto}" alt="preview">
                     ${isAdmin ? `<button type="button" class="del-photo-btn" data-index="${index}">&times;</button>` : ''}
                 </div>

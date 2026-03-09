@@ -712,16 +712,7 @@ select.form-control:disabled {
     border: 1px solid var(--border-color);
     background: #000;
     cursor: pointer;
-    transition: transform 0.2s ease, z-index 0s;
-}
-
-.photo-preview:hover,
-.photo-preview-mini img:hover {
-    transform: scale(15);
     position: relative;
-    z-index: 999;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-    transform-origin: right center;
 }
 
 .photo-preview-mini {
@@ -737,7 +728,28 @@ select.form-control:disabled {
     border: 1px solid var(--border-color);
     background: #000;
     cursor: pointer;
-    transition: transform 0.2s ease, z-index 0s;
+}
+
+/* Hover Zoom CSS Overlay */
+.photo-preview:hover::after,
+.photo-preview-mini:hover::after {
+    content: "";
+    position: fixed;
+    top: 50%;
+    left: 45%;
+    transform: translate(-50%, -50%);
+    width: 80vw;
+    height: 80vh;
+    background-image: inherit;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-color: rgba(0, 0, 0, 0.85);
+    border: 2px solid var(--accent-color);
+    border-radius: 8px;
+    z-index: 9999;
+    pointer-events: none;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
 }
 
 /* ========================================================
