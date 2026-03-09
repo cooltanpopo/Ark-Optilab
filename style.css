@@ -125,12 +125,11 @@ body {
 }
 
 .machine-item.has-data {
-    border-left: 4px solid var(--success);
-    background: rgba(16, 185, 129, 0.05);
+    border-left: 4px solid var(--accent-color);
 }
 
 .machine-item.has-data:hover {
-    background: rgba(16, 185, 129, 0.1);
+    background: rgba(255, 255, 255, 0.06);
 }
 
 .machine-item:hover {
@@ -147,7 +146,57 @@ body {
 .machine-item.has-data.active {
     background: rgba(59, 130, 246, 0.15);
     border-color: var(--accent-color);
-    border-left: 4px solid var(--success);
+    border-left: 4px solid var(--accent-color);
+}
+
+.traffic-light-container {
+    display: flex;
+    gap: 6px;
+    margin-right: 12px;
+}
+
+.traffic-light {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.traffic-light:hover {
+    transform: scale(1.1);
+}
+
+.traffic-light.red {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: #ef4444;
+}
+
+.traffic-light.red.active {
+    background: #ef4444;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+}
+
+.traffic-light.yellow {
+    background: rgba(245, 158, 11, 0.2);
+    border-color: #f59e0b;
+}
+
+.traffic-light.yellow.active {
+    background: #f59e0b;
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+}
+
+.traffic-light.green {
+    background: rgba(16, 185, 129, 0.2);
+    border-color: #10b981;
+}
+
+.traffic-light.green.active {
+    background: #10b981;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
 }
 
 .checkbox-wrapper {
@@ -544,6 +593,40 @@ body {
     background: rgba(255, 255, 255, 0.02);
 }
 
+/* Excel Table Styles */
+.excel-table th {
+    background: rgba(59, 130, 246, 0.15);
+    color: var(--text-primary);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.excel-table td {
+    white-space: nowrap;
+}
+
+.excel-table tr.date-row td {
+    background-color: #ffff00;
+    color: #000;
+    font-weight: bold;
+}
+
+.excel-table .status-cell.拆機中 {
+    background-color: #ffff00;
+    color: #000;
+    font-weight: bold;
+}
+
+.excel-table .status-cell.已拆機 {
+    color: #ef4444;
+}
+
+.excel-table .status-cell.已拆機-警示 {
+    color: #ef4444;
+}
+
 /* Form Inputs */
 .form-control {
     width: 100%;
@@ -629,13 +712,32 @@ select.form-control:disabled {
     border: 1px solid var(--border-color);
     background: #000;
     cursor: pointer;
+    transition: transform 0.2s ease, z-index 0s;
 }
 
-.photo-preview:hover {
-    transform: scale(2);
+.photo-preview:hover,
+.photo-preview-mini img:hover {
+    transform: scale(8);
     position: relative;
-    z-index: 10;
+    z-index: 999;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    transform-origin: center center;
+}
+
+.photo-preview-mini {
+    position: relative;
+    display: inline-block;
+}
+
+.photo-preview-mini img {
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
+    object-fit: cover;
+    border: 1px solid var(--border-color);
+    background: #000;
+    cursor: pointer;
+    transition: transform 0.2s ease, z-index 0s;
 }
 
 /* ========================================================

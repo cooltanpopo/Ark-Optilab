@@ -65,6 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     initSPA();
     initDailyReport();
+    initExcelViewer();
 });
 
 // ==========================================
@@ -222,6 +223,8 @@ function initMachineList() {
                 item.classList.add('has-data');
             }
 
+            const savedLight = localStorage.getItem(`statusLight_${displayName}`) || 'red';
+
             const radioHtml = `
                 <div class="checkbox-wrapper">
                     <input type="radio" name="machineSelect" value="${file}" id="machine_${index}">
@@ -229,15 +232,42 @@ function initMachineList() {
                 <div class="item-content">
                     <div class="item-title" title="${displayName}">${displayName}</div>
                 </div>
+                <div class="traffic-light-container">
+                    <div class="traffic-light red ${savedLight === 'red' ? 'active' : ''}" data-color="red" data-machine="${displayName}" title="尚未紀錄"></div>
+                    <div class="traffic-light yellow ${savedLight === 'yellow' ? 'active' : ''}" data-color="yellow" data-machine="${displayName}" title="部分紀錄"></div>
+                    <div class="traffic-light green ${savedLight === 'green' ? 'active' : ''}" data-color="green" data-machine="${displayName}" title="完整登錄"></div>
+                </div>
             `;
             item.innerHTML = radioHtml;
 
+            // Handle machine selection
             item.querySelector('input').addEventListener('change', (e) => {
                 document.querySelectorAll('.machine-item').forEach(el => el.classList.remove('active'));
                 if (e.target.checked) {
                     item.classList.add('active');
                     showMachineDetail(displayName, file);
                 }
+            });
+
+            // Handle traffic light clicks
+            const lights = item.querySelectorAll('.traffic-light');
+            lights.forEach(light => {
+                light.addEventListener('click', (e) => {
+                    e.preventDefault(); // prevent triggering the label radio
+                    if (!isAdmin) {
+                        alert("僅管理員可更改機台燈號狀態。");
+                        return;
+                    }
+                    const color = light.getAttribute('data-color');
+                    const machine = light.getAttribute('data-machine');
+
+                    // Update UI
+                    lights.forEach(l => l.classList.remove('active'));
+                    light.classList.add('active');
+
+                    // Save State
+                    localStorage.setItem(`statusLight_${machine}`, color);
+                });
             });
 
             machineListElement.appendChild(item);
@@ -444,7 +474,12 @@ function loadMachineData(machineName) {
 function saveRecord(machine, key, value) {
     let data = JSON.parse(localStorage.getItem(`records_${machine}`)) || {};
     data[key] = value;
-    localStorage.setItem(`records_${machine}`, JSON.stringify(data));
+    try {
+        localStorage.setItem(`records_${machine}`, JSON.stringify(data));
+    } catch (e) {
+        alert('照片儲存失敗！可能是因為您的裝置/瀏覽器儲存空間已滿，請嘗試刪除其他機台的照片後再試。');
+        console.error(e);
+    }
 }
 
 function saveDocState(machine, key, value) {
@@ -457,18 +492,19 @@ function handlePhotoUpload(e, machine, key) {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-        alert('照片檔案過大 (請小於 2MB)');
-        return;
-    }
-
     const reader = new FileReader();
-    reader.onload = function (evt) {
-        saveRecord(machine, key, evt.target.result);
-        loadMachineData(machine);
-        if (window.updateMachineListStatus) window.updateMachineListStatus();
+    reader.onload = async function (evt) {
+        try {
+            const compressed = await window.compressImage(evt.target.result);
+            saveRecord(machine, key, compressed);
+            loadMachineData(machine);
+            if (window.updateMachineListStatus) window.updateMachineListStatus();
+        } catch (err) {
+            console.error(err);
+        }
     };
     reader.readAsDataURL(file);
+    e.target.value = ''; // Reset input so the same file could be selected again if needed
 }
 
 window.hasMachineDataUploaded = function (machineName) {
@@ -536,11 +572,8 @@ function initDailyReport() {
             for (const file of files) {
                 try {
                     const base64 = await getBase64Report(file);
-                    if (base64.length > 3 * 1024 * 1024) {
-                        alert(`圖片 ${file.name} 檔案過大，請上傳較小的照片。`);
-                        continue;
-                    }
-                    photosBase64.push(base64);
+                    const compressed = await window.compressImage(base64);
+                    photosBase64.push(compressed);
                 } catch (err) {
                     console.error(err);
                 }
@@ -680,5 +713,132 @@ function initDailyReport() {
             `;
             historyList.appendChild(card);
         });
+    }
+}
+
+window.compressImage = function (base64Str, maxWidth = 1200, quality = 0.7) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.src = base64Str;
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+
+            if (width > maxWidth) {
+                height = Math.round((height * maxWidth) / width);
+                width = maxWidth;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = () => resolve(base64Str); // Fallback to original if load fails
+    });
+};
+
+// ==========================================
+// 9. Excel Viewer Logic
+// ==========================================
+async function initExcelViewer() {
+    const tableContainer = document.querySelector('#excelTable tbody');
+    if (!tableContainer) return;
+
+    try {
+        const response = await fetch('機台清單文字/RF360_For_Sale_List_compiled.xlsx');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+
+        // Grab the first sheet
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+
+        // Convert to JSON (array of arrays to capture header style easily)
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+        if (jsonData.length === 0) {
+            tableContainer.innerHTML = '<tr><td style="text-align: center; padding: 40px;">Excel 檔案為空</td></tr>';
+            return;
+        }
+
+        let html = '';
+
+        // We will render manually to add custom classes based on content
+        for (let i = 0; i < jsonData.length; i++) {
+            const row = jsonData[i];
+            // Skip completely empty rows
+            if (row.length === 0 || !row.some(cell => cell !== undefined && cell !== null && cell !== '')) {
+                continue;
+            }
+
+            const isHeader = i === 0 || (row[0] && row[0].toString().includes('Check Date'));
+
+            if (isHeader) {
+                html += '<thead><tr>';
+                for (let j = 0; j < row.length; j++) {
+                    // Usually we only care about columns up to 'H' (index 7) based on the image provided
+                    if (j > 7) break;
+                    html += `<th>${row[j] || ''}</th>`;
+                }
+                html += '</tr></thead><tbody>';
+            } else {
+                html += '<tr>';
+                for (let j = 0; j < row.length; j++) {
+                    if (j > 7) break;
+
+                    let cellValue = row[j] || '';
+                    let cellClass = '';
+
+                    // Apply special styling for the "狀態" column (usually index 7 / col H)
+                    if (j === 7) {
+                        cellClass = 'status-cell';
+                        if (cellValue.includes('拆機中')) cellClass += ' 拆機中';
+                        else if (cellValue.includes('已拆機')) {
+                            cellClass += ' 已拆機';
+                            if (cellValue.includes('警示') || cellValue.includes('管線')) cellClass += '-警示';
+                        }
+                    }
+
+                    // Format dates if it's a number (Excel serial date)
+                    if (typeof cellValue === 'number' && j === 0) {
+                        // Very rough excel date parsing (usually not perfect without formatting info, but good enough for generic display)
+                        const execDate = new Date(Math.round((cellValue - 25569) * 86400 * 1000));
+                        if (!isNaN(execDate.getTime())) {
+                            const month = execDate.getMonth() + 1;
+                            const dec = execDate.getDate() + 1; // timezone offset adj
+                            cellValue = `${month}月${dec}日`;
+                        }
+                    }
+
+                    html += `<td class="${cellClass}">${cellValue}</td>`;
+                }
+
+                // Pad missing cells if the row is shorter
+                for (let j = row.length; j <= 7; j++) {
+                    html += `<td></td>`;
+                }
+
+                html += '</tr>';
+            }
+        }
+
+        if (html.endsWith('<tbody>')) {
+            html += '</tbody>';
+        }
+
+        // Remove the existing '<tbody>' wrapper, replace entire inner HTML of table
+        document.getElementById('excelTable').innerHTML = html;
+
+    } catch (error) {
+        console.error("Error loading Excel file:", error);
+        tableContainer.innerHTML = '<tr><td style="text-align: center; padding: 40px; color: #ef4444;">無法讀取 Excel 檔案，請確認檔案「機台清單文字/RF360_For_Sale_List_compiled.xlsx」存在。</td></tr>';
     }
 }

@@ -9,6 +9,8 @@
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <!-- SheetJS for Excel parsing -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 </head>
 
 <body>
@@ -19,9 +21,13 @@
                 🚀
             </div>
             <ul class="nav-menu">
-                <li class="nav-item active" data-target="view-machine" title="機台詳細資訊">
+                <li class="nav-item active" data-target="view-excel" title="機台資訊清單 (Excel)">
                     <div class="nav-icon">📊</div>
                     <span class="nav-text">機台資訊</span>
+                </li>
+                <li class="nav-item" data-target="view-machine" title="搬移過程紀錄">
+                    <div class="nav-icon">🚚</div>
+                    <span class="nav-text">機台遷移資訊</span>
                 </li>
                 <li class="nav-item" data-target="view-report" title="現場每日回報">
                     <div class="nav-icon">📝</div>
@@ -43,26 +49,52 @@
         <div class="view-content">
 
             <!-- ==========================================
-                 VIEW 1: 機台資訊 (Machine Query)
+                 VIEW 0: Excel 機台清單 (New default)
                  ========================================== -->
-            <div id="view-machine" class="view-section active">
+            <div id="view-excel" class="view-section active">
+                <div class="excel-container glass-container"
+                    style="margin: 24px; padding: 24px; height: calc(100vh - 48px); display: flex; flex-direction: column;">
+                    <div class="section-header" style="margin-bottom: 20px;">
+                        <h2>機台資訊總表</h2>
+                        <p>RF360 For Sale List 狀態</p>
+                    </div>
+                    <div class="table-responsive" style="flex: 1; overflow: auto;">
+                        <table id="excelTable" class="data-table excel-table">
+                            <!-- JS將會載入資料 -->
+                            <tbody>
+                                <tr>
+                                    <td style="text-align: center; padding: 40px;">讀取中...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==========================================
+                 VIEW 1: 機台遷移資訊 (Machine Query)
+                 ========================================== -->
+            <div id="view-machine" class="view-section hidden">
                 <div class="app-container">
                     <!-- Sidebar -->
                     <aside class="sidebar">
                         <div class="sidebar-header">
                             <h1>機台詳細資訊</h1>
                             <p style="margin-bottom: 8px;">請勾選以查詢機台狀態</p>
-                            <div class="status-legend"
-                                style="display: flex; gap: 12px; margin-bottom: 16px; font-size: 0.85rem;">
-                                <div style="display: flex; align-items: center; gap: 6px;">
-                                    <span
-                                        style="width: 12px; height: 12px; border-radius: 50%; background: rgba(16, 185, 129, 0.15); border: 1px solid var(--success);"></span>
-                                    <span style="color: var(--text-secondary);">有資料上傳</span>
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 6px;">
-                                    <span
-                                        style="width: 12px; height: 12px; border-radius: 50%; background: transparent; border: 1px solid var(--border-color);"></span>
-                                    <span style="color: var(--text-secondary);">未有資料</span>
+                            <div class="status-legend" style="margin-bottom: 16px; font-size: 0.85rem;">
+                                <div style="display: flex; gap: 12px; margin-bottom: 6px;">
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span class="traffic-light red"></span>
+                                        <span style="color: var(--text-secondary);">尚未紀錄</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span class="traffic-light yellow"></span>
+                                        <span style="color: var(--text-secondary);">部分紀錄</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span class="traffic-light green"></span>
+                                        <span style="color: var(--text-secondary);">完整登錄</span>
+                                    </div>
                                 </div>
                             </div>
                             <div class="search-box">
