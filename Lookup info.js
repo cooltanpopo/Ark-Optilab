@@ -35,7 +35,7 @@ const machineFiles = [
 
 const checkItems = [
     { category: "清點", item: "設備清單核對", target: "逐一核對廠商、型號、Tool ID 是否與清單一致", type: "checkbox+note" },
-    { category: "紀錄", item: "機台尺寸", target: "部件1: 長x寬x高<br>...<br>部件15: 長x寬x高", type: "dimensions_multi" },
+    { category: "紀錄", item: "機台尺寸", target: "機台主體或拆解後之各部件尺寸", type: "dimensions_multi" },
     { category: "檢查", item: "損傷檢查", target: "檢查有無腐蝕、生鏽、化學噴濺痕跡", type: "radio-yesno" },
     { category: "評估", item: "安裝", target: "評估是否可由公司自行復機", type: "radio-eval" }
 ];
@@ -446,7 +446,16 @@ function loadMachineData(machineName) {
                         </div>
                         <div style="display:flex; align-items:center; gap:8px; font-size: 0.95rem;">
                             <span style="font-size: 0.85rem; color: #fff; white-space: nowrap;">水氣電管孔資訊：</span>
-                            <input type="text" class="status-dim hole-input form-control" data-index="${index}" data-sub="${i}" value="${savedHole}" placeholder="在此填寫相關資訊..." style="flex: 1; padding: 4px 8px; font-size: 0.85rem;" ${!isAdmin ? 'disabled' : ''}>
+                            <div style="display:flex; gap: 12px; margin-left: 4px;">
+                                <label style="display:flex; align-items:center; gap:4px; cursor: pointer;">
+                                    <input type="radio" name="hole_${index}_${i}" class="status-dim hole-radio form-control" data-index="${index}" data-sub="${i}" value="有" ${savedHole === '有' ? 'checked' : ''} ${!isAdmin ? 'disabled' : ''} style="width: 14px; height: 14px; accent-color: var(--primary-color);">
+                                    <span style="font-size: 0.85rem;">有</span>
+                                </label>
+                                <label style="display:flex; align-items:center; gap:4px; cursor: pointer;">
+                                    <input type="radio" name="hole_${index}_${i}" class="status-dim hole-radio form-control" data-index="${index}" data-sub="${i}" value="無" ${savedHole === '無' ? 'checked' : ''} ${!isAdmin ? 'disabled' : ''} style="width: 14px; height: 14px; accent-color: var(--primary-color);">
+                                    <span style="font-size: 0.85rem;">無</span>
+                                </label>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -503,7 +512,7 @@ function loadMachineData(machineName) {
                         else if (e.target.classList.contains('W-input')) dl = 'W';
                         else if (e.target.classList.contains('H-input')) dl = 'H';
                         else if (e.target.classList.contains('name-input')) dl = 'name';
-                        else if (e.target.classList.contains('hole-input')) dl = 'hole';
+                        else if (e.target.classList.contains('hole-radio') && e.target.checked) dl = 'hole';
 
                         if (dl) {
                             saveRecord(machineName, `dim_${index}_${e.target.dataset.sub}_${dl}`, e.target.value);
