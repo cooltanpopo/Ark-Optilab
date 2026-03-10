@@ -36,7 +36,7 @@ const machineFiles = [
 const checkItems = [
     { category: "清點", item: "設備清單核對", target: "逐一核對廠商、型號、Tool ID 是否與清單一致", type: "checkbox+note" },
     { category: "紀錄", item: "機台尺寸", target: "部件1: 長x寬x高<br>...<br>部件15: 長x寬x高", type: "dimensions_multi" },
-    { category: "檢查", item: "損傷檢查", target: "檢查有無腐蝕、生鏽、化學噴濺痕跡", type: "checkbox-yesno" },
+    { category: "檢查", item: "損傷檢查", target: "檢查有無腐蝕、生鏽、化學噴濺痕跡", type: "radio-yesno" },
     { category: "評估", item: "安裝", target: "評估是否可由公司自行復機", type: "radio-eval" }
 ];
 
@@ -333,7 +333,9 @@ function loadMachineData(machineName) {
         const savedPhoto = savedRecords[photoKey] || null;
 
         let photoHtml = '';
-        if (savedPhoto) {
+        if (item.type === 'dimensions_multi') {
+            photoHtml = '<span style="color:var(--text-secondary);font-size:0.85rem;">見左側各部件</span>';
+        } else if (savedPhoto) {
             photoHtml = `
                 <div class="photo-preview-mini" style="background-image: url('${savedPhoto}')">
                     <img src="${savedPhoto}" alt="preview">
@@ -366,32 +368,75 @@ function loadMachineData(machineName) {
                     <input type="text" class="status-note w-full" data-index="${index}" value="${noteText}" placeholder="備註..." ${!isAdmin ? 'disabled' : ''}>
                 </div>
             `;
-        } else if (item.type === 'checkbox' || item.type === 'checkbox-yesno') {
+        } else if (item.type === 'checkbox') {
             const isChecked = savedRecords[`check_${index}`] || false;
-            const labelText = item.type === 'checkbox-yesno' ? '是 (V)' : '完成 (V)';
+            const labelText = '完成 (V)';
             stateHtml = `
                 <div style="display:flex; flex-direction:column; gap:6px;">
-                    <label style="display:flex; align-items:center; gap:6px; font-weight: 500;">
-                        <input type="checkbox" class="status-check" data-index="${index}" ${isChecked ? 'checked' : ''} ${!isAdmin ? 'disabled' : ''} style="width: 16px; height: 16px; cursor: pointer;">
+                    <label style="display:flex; align-items:center; gap:6px; font-weight: 500; cursor: pointer;">
+                        <input type="checkbox" class="status-check" data-index="${index}" ${isChecked ? 'checked' : ''} ${!isAdmin ? 'disabled' : ''} style="width: 16px; height: 16px; accent-color: var(--primary-color);">
                         <span>${labelText}</span>
+                    </label>
+                </div>
+            `;
+        } else if (item.type === 'radio-yesno') {
+            const savedYesNo = savedRecords[`yesno_${index}`] || '';
+            stateHtml = `
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    <label style="display:flex; align-items:center; gap:6px; font-weight: 500; cursor: pointer;">
+                        <input type="radio" name="yesno_${index}" class="status-yesno" data-index="${index}" value="是 (V)" ${savedYesNo === '是 (V)' ? 'checked' : ''} ${!isAdmin ? 'disabled' : ''} style="width: 16px; height: 16px; accent-color: var(--primary-color);">
+                        <span>是 (V)</span>
+                    </label>
+                    <label style="display:flex; align-items:center; gap:6px; font-weight: 500; cursor: pointer;">
+                        <input type="radio" name="yesno_${index}" class="status-yesno" data-index="${index}" value="否" ${savedYesNo === '否' ? 'checked' : ''} ${!isAdmin ? 'disabled' : ''} style="width: 16px; height: 16px; accent-color: var(--primary-color);">
+                        <span>否</span>
                     </label>
                 </div>
             `;
         } else if (item.type === 'dimensions_multi') {
             let dimHtml = '<div style="display:flex; flex-direction:column; gap:12px; max-height: 450px; overflow-y: auto; padding-right: 8px;">';
             for (let i = 1; i <= 15; i++) {
+                const nameKey = `dim_${index}_${i}_name`;
                 const lKey = `dim_${index}_${i}_L`;
                 const wKey = `dim_${index}_${i}_W`;
                 const hKey = `dim_${index}_${i}_H`;
                 const holeKey = `dim_${index}_${i}_hole`;
+                const partPhotoKey = `dim_${index}_${i}_photo`;
+
+                const savedName = savedRecords[nameKey] || '';
                 const savedL = savedRecords[lKey] || '';
                 const savedW = savedRecords[wKey] || '';
                 const savedH = savedRecords[hKey] || '';
-                const savedHole = savedRecords[holeKey] || false;
+                const savedHole = savedRecords[holeKey] || '';
+                const savedPartPhoto = savedRecords[partPhotoKey] || null;
+
+                let partPhotoHtml = '';
+                if (savedPartPhoto) {
+                    partPhotoHtml = `
+                        <div class="photo-preview-mini" style="background-image: url('${savedPartPhoto}'); width: 44px; height: 44px; margin-left: auto; border-radius: 4px; position: relative;">
+                            ${isAdmin ? `<button type="button" class="del-part-photo-btn" data-index="${index}" data-sub="${i}" style="position: absolute; top: -6px; right: -6px; background: #ef4444; color: white; border: none; border-radius: 50%; width: 18px; height: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; line-height: 1;">&times;</button>` : ''}
+                        </div>
+                    `;
+                } else {
+                    if (isAdmin) {
+                        partPhotoHtml = `
+                            <label class="btn-upload" style="margin-left: auto; font-size: 0.8rem; padding: 4px 8px; cursor: pointer;">
+                                📁 照片
+                                <input type="file" accept="image/*" class="part-photo-input" data-index="${index}" data-sub="${i}" style="display:none;">
+                            </label>
+                        `;
+                    } else {
+                        partPhotoHtml = `<span style="color:var(--text-secondary);font-size:0.8rem; margin-left: auto;">無照片</span>`;
+                    }
+                }
 
                 dimHtml += `
                     <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
-                        <div style="font-size: 0.9rem; font-weight: 600; color: #fff; margin-bottom: 8px;">部件 ${i}</div>
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom: 10px;">
+                            <div style="font-size: 0.9rem; font-weight: 600; color: #fff; white-space: nowrap;">部件 ${i}</div>
+                            <input type="text" class="status-dim name-input form-control" data-index="${index}" data-sub="${i}" value="${savedName}" placeholder="在此輸入部件名稱..." style="flex: 1; padding: 4px 8px; font-size: 0.85rem;" ${!isAdmin ? 'disabled' : ''}>
+                            ${partPhotoHtml}
+                        </div>
                         <div style="display:flex; align-items:center; gap:8px; margin-bottom: 10px;">
                             <input type="number" class="status-dim L-input form-control" data-index="${index}" data-sub="${i}" value="${savedL}" placeholder="長" style="width: 70px; text-align: center; padding: 6px; flex: 1;" ${!isAdmin ? 'disabled' : ''}>
                             <span style="color:var(--text-secondary); font-weight: bold;">x</span>
@@ -399,10 +444,10 @@ function loadMachineData(machineName) {
                             <span style="color:var(--text-secondary); font-weight: bold;">x</span>
                             <input type="number" class="status-dim H-input form-control" data-index="${index}" data-sub="${i}" value="${savedH}" placeholder="高" style="width: 70px; text-align: center; padding: 6px; flex: 1;" ${!isAdmin ? 'disabled' : ''}>
                         </div>
-                        <label style="display:flex; align-items:center; gap:8px; font-size: 0.95rem; cursor: pointer;">
-                            <input type="checkbox" class="status-hole" data-index="${index}" data-sub="${i}" ${savedHole ? 'checked' : ''} ${!isAdmin ? 'disabled' : ''} style="width: 18px; height: 18px; accent-color: var(--primary-color);">
-                            <span>是否有水氣電管孔</span>
-                        </label>
+                        <div style="display:flex; align-items:center; gap:8px; font-size: 0.95rem;">
+                            <span style="font-size: 0.85rem; color: #fff; white-space: nowrap;">水氣電管孔資訊：</span>
+                            <input type="text" class="status-dim hole-input form-control" data-index="${index}" data-sub="${i}" value="${savedHole}" placeholder="在此填寫相關資訊..." style="flex: 1; padding: 4px 8px; font-size: 0.85rem;" ${!isAdmin ? 'disabled' : ''}>
+                        </div>
                     </div>
                 `;
             }
@@ -437,21 +482,46 @@ function loadMachineData(machineName) {
                 const noteInput = tr.querySelector('.status-note');
                 checkInput.addEventListener('change', (e) => saveRecord(machineName, `check_${index}`, e.target.checked));
                 noteInput.addEventListener('change', (e) => saveRecord(machineName, `note_${index}`, e.target.value));
-            } else if (item.type === 'checkbox' || item.type === 'checkbox-yesno') {
+            } else if (item.type === 'checkbox') {
                 const checkInput = tr.querySelector('.status-check');
                 checkInput.addEventListener('change', (e) => saveRecord(machineName, `check_${index}`, e.target.checked));
+            } else if (item.type === 'radio-yesno') {
+                const radios = tr.querySelectorAll('.status-yesno');
+                radios.forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        if (e.target.checked) {
+                            saveRecord(machineName, `yesno_${index}`, e.target.value);
+                        }
+                    });
+                });
             } else if (item.type === 'dimensions_multi') {
                 const dims = tr.querySelectorAll('.status-dim');
                 dims.forEach(inp => {
                     inp.addEventListener('change', (e) => {
-                        const dl = e.target.classList.contains('L-input') ? 'L' : (e.target.classList.contains('W-input') ? 'W' : 'H');
-                        saveRecord(machineName, `dim_${index}_${e.target.dataset.sub}_${dl}`, e.target.value);
+                        let dl = '';
+                        if (e.target.classList.contains('L-input')) dl = 'L';
+                        else if (e.target.classList.contains('W-input')) dl = 'W';
+                        else if (e.target.classList.contains('H-input')) dl = 'H';
+                        else if (e.target.classList.contains('name-input')) dl = 'name';
+                        else if (e.target.classList.contains('hole-input')) dl = 'hole';
+
+                        if (dl) {
+                            saveRecord(machineName, `dim_${index}_${e.target.dataset.sub}_${dl}`, e.target.value);
+                        }
                     });
                 });
-                const holes = tr.querySelectorAll('.status-hole');
-                holes.forEach(chk => {
-                    chk.addEventListener('change', (e) => {
-                        saveRecord(machineName, `dim_${index}_${e.target.dataset.sub}_hole`, e.target.checked);
+                const partPhotoInputs = tr.querySelectorAll('.part-photo-input');
+                partPhotoInputs.forEach(pInput => {
+                    pInput.addEventListener('change', (e) => {
+                        handlePhotoUpload(e, machineName, `dim_${index}_${e.target.dataset.sub}_photo`);
+                    });
+                });
+                const delPartBtns = tr.querySelectorAll('.del-part-photo-btn');
+                delPartBtns.forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        saveRecord(machineName, `dim_${index}_${e.currentTarget.dataset.sub}_photo`, null);
+                        loadMachineData(machineName); // re-render
+                        if (window.updateMachineListStatus) window.updateMachineListStatus();
                     });
                 });
             } else if (item.type === 'radio-eval') {
@@ -570,7 +640,7 @@ function handlePhotoUpload(e, machine, key) {
 window.hasMachineDataUploaded = function (machineName) {
     const savedRecords = JSON.parse(localStorage.getItem(`records_${machineName}`)) || {};
     for (const key in savedRecords) {
-        if (key.startsWith('photo_') && savedRecords[key] !== null) {
+        if (key.includes('photo') && savedRecords[key] !== null) {
             return true;
         }
     }
