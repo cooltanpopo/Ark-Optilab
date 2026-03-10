@@ -35,11 +35,9 @@ const machineFiles = [
 
 const checkItems = [
     { category: "清點", item: "設備清單核對", target: "逐一核對廠商、型號、Tool ID 是否與清單一致", type: "checkbox+note" },
-    { category: "紀錄", item: "整體尺寸", target: "量測設備整體：長(cm) x 寬(cm) x 高(cm)", type: "checkbox" },
-    { category: "紀錄", item: "組件尺寸", target: "各獨立組件拆解後的尺寸紀錄", type: "checkbox" },
+    { category: "紀錄", item: "機台尺寸", target: "部件1: 長x寬x高<br>...<br>部件15: 長x寬x高", type: "dimensions_multi" },
     { category: "檢查", item: "損傷檢查", target: "檢查有無腐蝕、生鏽、化學噴濺痕跡", type: "checkbox-yesno" },
-    { category: "紀錄", item: "電力資訊", target: "電壓(V)、相數(Ph)、瓦數(W) 或電流(A)", type: "checkbox" },
-    { category: "紀錄", item: "水/氣介面", target: "紀錄管徑尺寸與介面規格 (如 VCR, Swagelok)", type: "checkbox" }
+    { category: "評估", item: "安裝", target: "評估是否可由公司自行復機", type: "radio-eval" }
 ];
 
 const docItems = [
@@ -379,6 +377,47 @@ function loadMachineData(machineName) {
                     </label>
                 </div>
             `;
+        } else if (item.type === 'dimensions_multi') {
+            let dimHtml = '<div style="display:flex; flex-direction:column; gap:12px; max-height: 450px; overflow-y: auto; padding-right: 8px;">';
+            for (let i = 1; i <= 15; i++) {
+                const lKey = `dim_${index}_${i}_L`;
+                const wKey = `dim_${index}_${i}_W`;
+                const hKey = `dim_${index}_${i}_H`;
+                const holeKey = `dim_${index}_${i}_hole`;
+                const savedL = savedRecords[lKey] || '';
+                const savedW = savedRecords[wKey] || '';
+                const savedH = savedRecords[hKey] || '';
+                const savedHole = savedRecords[holeKey] || false;
+
+                dimHtml += `
+                    <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+                        <div style="font-size: 0.9rem; font-weight: 600; color: #fff; margin-bottom: 8px;">部件 ${i}</div>
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom: 10px;">
+                            <input type="number" class="status-dim L-input form-control" data-index="${index}" data-sub="${i}" value="${savedL}" placeholder="長" style="width: 70px; text-align: center; padding: 6px; flex: 1;" ${!isAdmin ? 'disabled' : ''}>
+                            <span style="color:var(--text-secondary); font-weight: bold;">x</span>
+                            <input type="number" class="status-dim W-input form-control" data-index="${index}" data-sub="${i}" value="${savedW}" placeholder="寬" style="width: 70px; text-align: center; padding: 6px; flex: 1;" ${!isAdmin ? 'disabled' : ''}>
+                            <span style="color:var(--text-secondary); font-weight: bold;">x</span>
+                            <input type="number" class="status-dim H-input form-control" data-index="${index}" data-sub="${i}" value="${savedH}" placeholder="高" style="width: 70px; text-align: center; padding: 6px; flex: 1;" ${!isAdmin ? 'disabled' : ''}>
+                        </div>
+                        <label style="display:flex; align-items:center; gap:8px; font-size: 0.95rem; cursor: pointer;">
+                            <input type="checkbox" class="status-hole" data-index="${index}" data-sub="${i}" ${savedHole ? 'checked' : ''} ${!isAdmin ? 'disabled' : ''} style="width: 18px; height: 18px; accent-color: var(--primary-color);">
+                            <span>是否有水氣電管孔</span>
+                        </label>
+                    </div>
+                `;
+            }
+            dimHtml += '</div>';
+            stateHtml = dimHtml;
+        } else if (item.type === 'radio-eval') {
+            const savedEval = savedRecords[`eval_${index}`] || '請選擇';
+            stateHtml = `
+                <select class="status-eval form-control w-full" data-index="${index}" ${!isAdmin ? 'disabled' : ''}>
+                    <option value="請選擇" ${savedEval === '請選擇' ? 'selected' : ''}>請選擇</option>
+                    <option value="是" ${savedEval === '是' ? 'selected' : ''}>是</option>
+                    <option value="否" ${savedEval === '否' ? 'selected' : ''}>否</option>
+                    <option value="不確定" ${savedEval === '不確定' ? 'selected' : ''}>不確定</option>
+                </select>
+            `;
         } else {
             stateHtml = `<input type="text" class="status-input w-full" data-index="${index}" value="${savedState}" placeholder="輸入紀錄..." ${!isAdmin ? 'disabled' : ''}>`;
         }
@@ -401,11 +440,32 @@ function loadMachineData(machineName) {
             } else if (item.type === 'checkbox' || item.type === 'checkbox-yesno') {
                 const checkInput = tr.querySelector('.status-check');
                 checkInput.addEventListener('change', (e) => saveRecord(machineName, `check_${index}`, e.target.checked));
+            } else if (item.type === 'dimensions_multi') {
+                const dims = tr.querySelectorAll('.status-dim');
+                dims.forEach(inp => {
+                    inp.addEventListener('change', (e) => {
+                        const dl = e.target.classList.contains('L-input') ? 'L' : (e.target.classList.contains('W-input') ? 'W' : 'H');
+                        saveRecord(machineName, `dim_${index}_${e.target.dataset.sub}_${dl}`, e.target.value);
+                    });
+                });
+                const holes = tr.querySelectorAll('.status-hole');
+                holes.forEach(chk => {
+                    chk.addEventListener('change', (e) => {
+                        saveRecord(machineName, `dim_${index}_${e.target.dataset.sub}_hole`, e.target.checked);
+                    });
+                });
+            } else if (item.type === 'radio-eval') {
+                const evalSelect = tr.querySelector('.status-eval');
+                evalSelect.addEventListener('change', (e) => {
+                    saveRecord(machineName, `eval_${index}`, e.target.value);
+                });
             } else {
                 const textInput = tr.querySelector('.status-input');
-                textInput.addEventListener('change', (e) => {
-                    saveRecord(machineName, stateKey, e.target.value);
-                });
+                if (textInput) {
+                    textInput.addEventListener('change', (e) => {
+                        saveRecord(machineName, stateKey, e.target.value);
+                    });
+                }
             }
 
             const pInput = tr.querySelector('.photo-input');
