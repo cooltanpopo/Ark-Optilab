@@ -49,20 +49,56 @@ const docItems = [
 ];
 
 // ==========================================
-// 2. Global State & Auth
+// 2. Global State & Auth & Cloud Storage
 // ==========================================
 let isAdmin = false;
 let currentMachine = null;
 
+// Cloud Storage Utilities
+const cloudStorage = {
+    async get(key) {
+        try {
+            const res = await fetch(`/api/get-data?key=${encodeURIComponent(key)}`);
+            if (!res.ok) throw new Error('Network response was not ok');
+            const data = await res.json();
+            return data.value;
+        } catch (error) {
+            console.error('Error fetching data from cloud:', error);
+            // Fallback to local storage for offline support/testing
+            const localData = localStorage.getItem(key);
+            try { return JSON.parse(localData); } catch (e) { return localData; }
+        }
+    },
+    async set(key, value) {
+        try {
+            const res = await fetch('/api/save-data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key, value })
+            });
+            if (!res.ok) throw new Error('Network response was not ok');
+        } catch (error) {
+            console.error('Error saving data to cloud:', error);
+            // Fallback to local storage
+            const dataToSave = typeof value === 'object' ? JSON.stringify(value) : value;
+            try {
+                localStorage.setItem(key, dataToSave);
+            } catch (e) {
+                console.error("Local storage error:", e);
+            }
+        }
+    }
+};
+
 // ==========================================
 // 3. Initialization
 // ==========================================
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     initAuth();
-    initMachineList();
+    await initMachineList();
     initTabs();
     initSPA();
-    initDailyReport();
+    await initDailyReport();
     initExcelViewer();
 });
 
@@ -201,44 +237,52 @@ function toggleDailyReportAuth() {
 // ==========================================
 // 6. Machine List & Search
 // ==========================================
-function initMachineList() {
+async function initMachineList() {
     const searchInput = document.getElementById('searchInput');
     const machineListElement = document.getElementById('machineList');
 
-    function renderList(files) {
-        machineListElement.innerHTML = '';
+    async function renderList(files) {
+        machineListElement.innerHTML = '<div style="padding: 24px; text-align: center; color: var(--text-secondary);">資料載入中...</div>';
 
         if (files.length === 0) {
             machineListElement.innerHTML = '<div style="padding: 24px 12px; color: var(--text-secondary); text-align: center; font-size: 0.9rem;">查無符合的機台檔案</div>';
             return;
         }
 
-        files.forEach((file, index) => {
+        // Fetch all status lights at once or sequentially
+        const renderedItems = [];
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
             const displayName = file.replace('.pdf', '');
-            const item = document.createElement('label');
-            item.className = 'machine-item';
-            if (window.hasMachineDataUploaded && window.hasMachineDataUploaded(displayName)) {
-                item.classList.add('has-data');
-            }
+            const hasData = await window.hasMachineDataUploaded(displayName);
+            let savedLight = await cloudStorage.get(`statusLight_${displayName}`);
+            if (!savedLight) savedLight = 'red'; // Default
 
-            const savedLight = localStorage.getItem(`statusLight_${displayName}`) || 'red';
-
-            const radioHtml = `
-                <div class="checkbox-wrapper">
-                    <input type="radio" name="machineSelect" value="${file}" id="machine_${index}">
-                </div>
-                <div class="item-content">
-                    <div class="item-title" title="${displayName}">${displayName}</div>
-                </div>
-                <div class="traffic-light-container">
-                    <div class="traffic-light red ${savedLight === 'red' ? 'active' : ''}" data-color="red" data-machine="${displayName}" title="尚未紀錄"></div>
-                    <div class="traffic-light yellow ${savedLight === 'yellow' ? 'active' : ''}" data-color="yellow" data-machine="${displayName}" title="部分紀錄"></div>
-                    <div class="traffic-light green ${savedLight === 'green' ? 'active' : ''}" data-color="green" data-machine="${displayName}" title="完整登錄"></div>
-                </div>
+            const itemHtml = `
+                <label class="machine-item ${hasData ? 'has-data' : ''}">
+                    <div class="checkbox-wrapper">
+                        <input type="radio" name="machineSelect" value="${file}" id="machine_${i}">
+                    </div>
+                    <div class="item-content">
+                        <div class="item-title" title="${displayName}">${displayName}</div>
+                    </div>
+                    <div class="traffic-light-container">
+                        <div class="traffic-light red ${savedLight === 'red' ? 'active' : ''}" data-color="red" data-machine="${displayName}" title="尚未紀錄"></div>
+                        <div class="traffic-light yellow ${savedLight === 'yellow' ? 'active' : ''}" data-color="yellow" data-machine="${displayName}" title="部分紀錄"></div>
+                        <div class="traffic-light green ${savedLight === 'green' ? 'active' : ''}" data-color="green" data-machine="${displayName}" title="完整登錄"></div>
+                    </div>
+                </label>
             `;
-            item.innerHTML = radioHtml;
+            renderedItems.push({ html: itemHtml, file, displayName });
+        }
 
-            // Handle machine selection
+        machineListElement.innerHTML = renderedItems.map(item => item.html).join('');
+
+        // Attach events
+        const items = machineListElement.querySelectorAll('.machine-item');
+        items.forEach((item, index) => {
+            const { file, displayName } = renderedItems[index];
+
             item.querySelector('input').addEventListener('change', (e) => {
                 document.querySelectorAll('.machine-item').forEach(el => el.classList.remove('active'));
                 if (e.target.checked) {
@@ -247,11 +291,10 @@ function initMachineList() {
                 }
             });
 
-            // Handle traffic light clicks
             const lights = item.querySelectorAll('.traffic-light');
             lights.forEach(light => {
-                light.addEventListener('click', (e) => {
-                    e.preventDefault(); // prevent triggering the label radio
+                light.addEventListener('click', async (e) => {
+                    e.preventDefault();
                     if (!isAdmin) {
                         alert("僅管理員可更改機台燈號狀態。");
                         return;
@@ -259,25 +302,23 @@ function initMachineList() {
                     const color = light.getAttribute('data-color');
                     const machine = light.getAttribute('data-machine');
 
-                    // Update UI
                     lights.forEach(l => l.classList.remove('active'));
                     light.classList.add('active');
 
-                    // Save State
-                    localStorage.setItem(`statusLight_${machine}`, color);
+                    light.style.opacity = '0.5'; // loading indication
+                    await cloudStorage.set(`statusLight_${machine}`, color);
+                    light.style.opacity = '1';
                 });
             });
-
-            machineListElement.appendChild(item);
         });
     }
 
-    renderList(machineFiles);
+    await renderList(machineFiles);
 
-    searchInput.addEventListener('input', (e) => {
+    searchInput.addEventListener('input', async (e) => {
         const term = e.target.value.toLowerCase();
         const filtered = machineFiles.filter(f => f.toLowerCase().includes(term));
-        renderList(filtered);
+        await renderList(filtered);
     });
 }
 
@@ -317,13 +358,20 @@ function initTabs() {
     });
 }
 
-function loadMachineData(machineName) {
+async function loadMachineData(machineName) {
     const recordsTbody = document.getElementById('recordsTbody');
     const docsTbody = document.getElementById('docsTbody');
 
+    recordsTbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">資料載入中...</td></tr>';
+    docsTbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">資料載入中...</td></tr>';
+
     // Process Records Table
+    let savedRecords = await cloudStorage.get(`records_${machineName}`);
+    if (typeof savedRecords === 'string') {
+        try { savedRecords = JSON.parse(savedRecords); } catch (e) { savedRecords = {}; }
+    }
+    savedRecords = savedRecords || {};
     recordsTbody.innerHTML = '';
-    const savedRecords = JSON.parse(localStorage.getItem(`records_${machineName}`)) || {};
 
     checkItems.forEach((item, index) => {
         const tr = document.createElement('tr');
@@ -567,7 +615,11 @@ function loadMachineData(machineName) {
 
     // Process Docs Table
     docsTbody.innerHTML = '';
-    const savedDocs = JSON.parse(localStorage.getItem(`docs_${machineName}`)) || {};
+    let savedDocs = await cloudStorage.get(`docs_${machineName}`);
+    if (typeof savedDocs === 'string') {
+        try { savedDocs = JSON.parse(savedDocs); } catch (e) { savedDocs = {}; }
+    }
+    savedDocs = savedDocs || {};
 
     docItems.forEach((item, index) => {
         const tr = document.createElement('tr');
@@ -598,33 +650,30 @@ function loadMachineData(machineName) {
             const selectEl = tr.querySelector('.docs-select');
             const noteEl = tr.querySelector('.docs-note');
 
-            selectEl.addEventListener('change', (e) => {
-                saveDocState(machineName, e.target.dataset.key, e.target.value);
-            });
-            noteEl.addEventListener('change', (e) => {
-                saveDocState(machineName, e.target.dataset.key, e.target.value);
-            });
+            selectEl.addEventListener('change', (e) => saveDocState(machineName, e.target.dataset.key, e.target.value));
+            noteEl.addEventListener('change', (e) => saveDocState(machineName, e.target.dataset.key, e.target.value));
         }
 
         docsTbody.appendChild(tr);
     });
 }
 
-function saveRecord(machine, key, value) {
-    let data = JSON.parse(localStorage.getItem(`records_${machine}`)) || {};
-    data[key] = value;
-    try {
-        localStorage.setItem(`records_${machine}`, JSON.stringify(data));
-    } catch (e) {
-        alert('照片儲存失敗！可能是因為您的裝置/瀏覽器儲存空間已滿，請嘗試刪除其他機台的照片後再試。');
-        console.error(e);
+async function saveRecord(machine, key, value) {
+    let data = await cloudStorage.get(`records_${machine}`) || {};
+    if (typeof data === 'string') {
+        try { data = JSON.parse(data); } catch (e) { data = {}; }
     }
+    data[key] = value;
+    await cloudStorage.set(`records_${machine}`, data);
 }
 
-function saveDocState(machine, key, value) {
-    let data = JSON.parse(localStorage.getItem(`docs_${machine}`)) || {};
+async function saveDocState(machine, key, value) {
+    let data = await cloudStorage.get(`docs_${machine}`) || {};
+    if (typeof data === 'string') {
+        try { data = JSON.parse(data); } catch (e) { data = {}; }
+    }
     data[key] = value;
-    localStorage.setItem(`docs_${machine}`, JSON.stringify(data));
+    await cloudStorage.set(`docs_${machine}`, data);
 }
 
 function handlePhotoUpload(e, machine, key) {
@@ -635,8 +684,8 @@ function handlePhotoUpload(e, machine, key) {
     reader.onload = async function (evt) {
         try {
             const compressed = await window.compressImage(evt.target.result);
-            saveRecord(machine, key, compressed);
-            loadMachineData(machine);
+            await saveRecord(machine, key, compressed);
+            await loadMachineData(machine);
             if (window.updateMachineListStatus) window.updateMachineListStatus();
         } catch (err) {
             console.error(err);
@@ -646,8 +695,13 @@ function handlePhotoUpload(e, machine, key) {
     e.target.value = ''; // Reset input so the same file could be selected again if needed
 }
 
-window.hasMachineDataUploaded = function (machineName) {
-    const savedRecords = JSON.parse(localStorage.getItem(`records_${machineName}`)) || {};
+window.hasMachineDataUploaded = async function (machineName) {
+    let savedRecords = await cloudStorage.get(`records_${machineName}`);
+    if (typeof savedRecords === 'string') {
+        try { savedRecords = JSON.parse(savedRecords); } catch (e) { savedRecords = {}; }
+    }
+    savedRecords = savedRecords || {};
+
     for (const key in savedRecords) {
         if (key.includes('photo') && savedRecords[key] !== null) {
             return true;
@@ -656,24 +710,25 @@ window.hasMachineDataUploaded = function (machineName) {
     return false;
 };
 
-window.updateMachineListStatus = function () {
+window.updateMachineListStatus = async function () {
     const items = document.querySelectorAll('.machine-item');
-    items.forEach(item => {
+    for (const item of items) {
         const input = item.querySelector('input[type="radio"]');
-        if (!input) return;
+        if (!input) continue;
         const displayName = input.value.replace('.pdf', '');
-        if (window.hasMachineDataUploaded(displayName)) {
+        const hasData = await window.hasMachineDataUploaded(displayName);
+        if (hasData) {
             item.classList.add('has-data');
         } else {
             item.classList.remove('has-data');
         }
-    });
+    }
 };
 
 // ==========================================
 // 8. Daily Report Logic
 // ==========================================
-function initDailyReport() {
+async function initDailyReport() {
     const form = document.getElementById('dailyReportForm');
     if (!form) return;
 
@@ -685,6 +740,7 @@ function initDailyReport() {
     const historyList = document.getElementById('historyList');
     const historyPlaceholder = document.getElementById('historyPlaceholder');
     const clearFormBtn = document.getElementById('clearFormBtn');
+    const submitBtn = form.querySelector('button[type="submit"]');
 
     const MAX_PHOTOS = 5;
     let photosBase64 = [];
@@ -696,7 +752,7 @@ function initDailyReport() {
     const dd = String(today.getDate()).padStart(2, '0');
     if (reportDateInput) reportDateInput.value = `${yyyy}-${mm}-${dd}`;
 
-    loadHistory();
+    await loadHistory();
     setTimeout(toggleDailyReportAuth, 100);
 
     if (photoInput) {
@@ -760,13 +816,16 @@ function initDailyReport() {
     }
 
     if (form) {
-        form.addEventListener('submit', (e) => {
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (!isAdmin) return;
 
             if (photosBase64.length === 0) {
                 if (!confirm("您尚未上傳任何照片。確定要送出嗎？")) return;
             }
+
+            submitBtn.textContent = '傳送中...';
+            submitBtn.disabled = true;
 
             const newReport = {
                 id: Date.now().toString(),
@@ -779,17 +838,24 @@ function initDailyReport() {
                 timestamp: new Date().toISOString()
             };
 
-            const history = JSON.parse(localStorage.getItem('dailyReports')) || [];
+            let history = await cloudStorage.get('dailyReports');
+            if (typeof history === 'string') {
+                try { history = JSON.parse(history); } catch (e) { history = []; }
+            }
+            history = history || [];
             history.unshift(newReport);
 
             try {
-                localStorage.setItem('dailyReports', JSON.stringify(history));
+                await cloudStorage.set('dailyReports', history);
                 alert('回報已成功送出！');
                 clearForm();
-                loadHistory();
+                await loadHistory();
             } catch (err) {
                 console.error(err);
-                alert('儲存失敗，可能是照片總容量超過瀏覽器限制 (10MB)。');
+                alert('進度回報儲存失敗，請重試。');
+            } finally {
+                submitBtn.textContent = '送出回報紀錄';
+                submitBtn.disabled = false;
             }
         });
     }
@@ -807,18 +873,25 @@ function initDailyReport() {
         renderPhotoPreviews();
     }
 
-    function loadHistory() {
+    async function loadHistory() {
         if (!historyList) return;
-        const history = JSON.parse(localStorage.getItem('dailyReports')) || [];
+        historyList.innerHTML = '<div style="padding: 24px; text-align: center; color: var(--text-secondary);">資料載入中...</div>';
+
+        let history = await cloudStorage.get('dailyReports');
+        if (typeof history === 'string') {
+            try { history = JSON.parse(history); } catch (e) { history = []; }
+        }
+        history = history || [];
 
         if (history.length === 0) {
             if (historyPlaceholder) historyPlaceholder.style.display = 'flex';
-            historyList.querySelectorAll('.history-card').forEach(c => c.remove());
+            historyList.innerHTML = '';
+            // Just leaving the placeholder visible is fine
             return;
         }
 
         if (historyPlaceholder) historyPlaceholder.style.display = 'none';
-        historyList.querySelectorAll('.history-card').forEach(c => c.remove());
+        historyList.innerHTML = '';
 
         history.forEach(report => {
             const card = document.createElement('div');
